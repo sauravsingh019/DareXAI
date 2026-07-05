@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Multi-tenancy ───────────────────────────────────────────────
+model Tenant {
+  id            String   @id @default(uuid())
+  name          String
+  slug          String   @unique
+  industry      String?
+  onboarded     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users         User[]
+  contacts      Contact[]
+  opportunities Opportunity[]
+  conversations Conversation[]
+  tasks         Task[]
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
+
+  @@map("tenants")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email          String
+  name           String?
+  avatarUrl      String?
+  googleId       String?  @unique
+  role           Role     @default(OWNER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ─── Auth ────────────────────────────────────────────────────────
+model RefreshToken {
+  id          String   @id @default(uuid())
+  tokenHash   String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  family      String   // rotation family id — reused across a rotation chain
+  revoked     Boolean  @default(false)
+  replacedBy  String?
+  userAgent   String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([family])
+  @@map("refresh_tokens")
+}
+
+// ─── CRM ─────────────────────────────────────────────────────────
+model Contact {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  phone         String?
+  email         String?
+  company       String?
+  tags          String[] @default([])
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  opportunities Opportunity[]
+  conversations Conversation[]
+  tasks         Task[]
+
+  @@index([tenantId])
+  @@index([tenantId, phone])
+  @@map("contacts")
+}
+
+model Opportunity {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  title          String
+  stage          Stage    @default(NEW)
+  value          Float    @default(0)
+  score          Int?     // AI qualification score 0-100
+  nextBestAction String?
+  nbaReasoning   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, stage])
+  @@map("opportunities")
+}
+
+enum Stage {
+  NEW
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+// ─── Unified Inbox ───────────────────────────────────────────────
+model Conversation {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contactId    String?
+  contact      Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  channel      Channel
+  summary      String?
+  sentiment    String?  // positive | neutral | negative
+  intent       String?
+  nextAction   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages     Message[]
+
+  @@index([tenantId])
+  @@map("conversations")
+}
+
+enum Channel {
+  WHATSAPP
+  EMAIL
+  CALL
+  AI_CHAT
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      Direction
+  role           String?      // for AI_CHAT: user | assistant | tool
+  content        String
+  toolName       String?
+  toolArgs       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+// ─── Tasks / Follow-ups ─────────────────────────────────────────
+model Task {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contactId   String?
+  contact     Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  title       String
+  dueAt       DateTime?
+  status      TaskStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+
+  @@index([tenantId])
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // e.g. "ai.tool.send_whatsapp", "auth.login"
+  entity    String?  // e.g. "Contact:uuid"
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("audit_logs")
+}
