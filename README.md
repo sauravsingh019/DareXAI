@@ -17,21 +17,82 @@ traditional CRUD dashboard with a chatbot bolted on.
 | Styling | Tailwind CSS |
 | Tests | Vitest + Testing Library |
 
-## Quick start
+## Project Structure
 
-```bash
-npm install
-cp .env.example .env         # fill in DATABASE_URL, GOOGLE_*, GEMINI_API_KEY
-npx prisma generate
-npx prisma migrate dev --name init
-npm run dev
+The project follows a standard Next.js App Router structure with Prisma database modeling and custom AI/Auth libraries:
+
+```text
+├── app/                      # Next.js App Router pages and APIs
+│   ├── (console)/            # Route group sharing centralized sidebar layout
+│   │   ├── dashboard/        # Operations console KPI metrics
+│   │   ├── inbox/            # Unified inbox (WhatsApp/Email/Calls timeline)
+│   │   ├── crm/              # B2B deal pipeline and contact list
+│   │   └── ...               # Additional operational console modules
+│   ├── api/                  # REST and SSE API route endpoints
+│   │   ├── ai/               # AI Assistant endpoints
+│   │   ├── auth/             # Login, Google OAuth, session refresh, bypass
+│   │   └── ...               # CRM, logs, simulator and webhook controllers
+│   ├── login/                # Authentication entrance page
+│   ├── onboarding/           # Tenant metadata setup screen
+│   ├── layout.tsx            # Root HTML layout structure
+│   └── page.tsx              # Public landing page
+├── components/               # Shared React UI components
+│   ├── ConsoleLayout.tsx     # Centralized dashboard flex container with sidebar
+│   ├── Sidebar.tsx           # Navigation panel for Console pages
+│   └── ...                   # Custom UI components (KpiCard, DareXLogo, etc.)
+├── lib/                      # Business logic modules & helpers
+│   ├── ai/                   # Gemini API, tool execution, eQTL insights
+│   ├── auth/                 # JWT signing, PKCE generator, secure cookies
+│   └── ...                   # Prisma client, Whatsapp API, validation schemas
+├── prisma/                   # Database ORM modeling
+│   ├── schema.prisma         # Schema definitions (Tenant, Contact, Opportunity, etc.)
+│   └── seed.ts               # Sample CRM data provisioning seed script
+└── __tests__/                # Automated unit and integration tests
 ```
 
-Sign in once via **Continue with Google** (this auto-provisions your tenant) or use the **⚡ Developer Bypass Login** button (active in development/unconfigured OAuth mode) to sign in instantly. Complete onboarding, then optionally seed demo CRM data for that tenant:
+## Setup & Quick Start
 
+Follow these steps to configure your environment and run the application locally:
+
+### 1. Install Dependencies
+Initialize package requirements:
+```bash
+npm install
+```
+
+### 2. Configure Environment Secrets
+Create a `.env` file from the example template:
+```bash
+cp .env.example .env
+```
+Fill in the following key parameters in `.env`:
+* `DATABASE_URL`: PostgreSQL connection string (e.g., `postgresql://user:pass@localhost:5432/db`)
+* `GEMINI_API_KEY`: Google AI Developer Studio credential for AI features
+* `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: OAuth keys (optional, fallback bypass available)
+* `NEXT_PUBLIC_APP_URL`: Set to `http://localhost:3000` for local development
+
+### 3. Initialize Database Migrations
+Generate Prisma clients and run initial tables schema migrations:
+```bash
+npx prisma generate
+npx prisma migrate dev --name init
+```
+
+### 4. Seed Development Data
+After signing in for the first time via the browser, populate mock B2B contacts, tasks, and opportunities:
 ```bash
 npm run db:seed
 ```
+
+### 5. Launch Development Server
+Start Next.js local development process:
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+*Note on Bypass Login*: If OAuth credentials are not configured, you can click **⚡ Developer Bypass Login** on the login page to instantly sign in and automatically register a test tenant workspace.
+
 
 ### Inbound Events & Workflows Simulator
 Once logged in, navigate to the **Simulator** page (`/simulator`) to trigger operations flows with one click:

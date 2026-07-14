@@ -143,7 +143,7 @@ export default function TicketsPage() {
               <div>
                 <span className="text-[10px] text-mute block font-mono">TICKET DETAILS</span>
                 <span className="text-xs font-bold text-ink block mt-0.5">#{selectedTicket.id} · {selectedTicket.subject}</span>
-                <span className="text-[10px] text-mute mt-0.5 block">{selectedCall => selectedTicket.name} · {selectedTicket.company}</span>
+                <span className="text-[10px] text-mute mt-0.5 block">{selectedTicket.name} · {selectedTicket.company}</span>
               </div>
 
               <div>
